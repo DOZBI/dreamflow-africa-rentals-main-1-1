@@ -104,7 +104,7 @@ const ListingComments = ({ listingId, onCommentAdded }: ListingCommentsProps) =>
         `)
         .eq('listing_id', listingId)
         .is('parent_id', null)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
       setComments(data as Comment[] || []);
@@ -181,19 +181,21 @@ const ListingComments = ({ listingId, onCommentAdded }: ListingCommentsProps) =>
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center space-x-2">
-        <MessageCircle className="h-5 w-5 text-gray-600" />
-        <h3 className="font-semibold text-lg">Commentaires ({comments.length})</h3>
+    <div className="flex flex-col h-full max-h-full overflow-hidden">
+      <div className="flex-shrink-0 mb-4">
+        <div className="flex items-center space-x-2">
+          <MessageCircle className="h-5 w-5 text-gray-600" />
+          <h3 className="font-semibold text-lg">Commentaires ({comments.length})</h3>
+        </div>
       </div>
 
       {user && (
-        <form onSubmit={handleSubmitComment} className="space-y-3">
+        <form onSubmit={handleSubmitComment} className="flex-shrink-0 space-y-3 mb-4">
           <Textarea
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             placeholder="Ajouter un commentaire..."
-            className="min-h-[100px] resize-none"
+            className="min-h-[80px] resize-none"
           />
           <div className="flex justify-end">
             <Button
@@ -208,7 +210,7 @@ const ListingComments = ({ listingId, onCommentAdded }: ListingCommentsProps) =>
         </form>
       )}
 
-      <div className="space-y-4">
+      <div className="flex-1 overflow-y-auto space-y-4 pr-2">
         {isLoading ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -228,7 +230,7 @@ const ListingComments = ({ listingId, onCommentAdded }: ListingCommentsProps) =>
                 exit={{ opacity: 0, y: -20 }}
                 className="flex space-x-3 p-4 bg-gray-50 rounded-lg"
               >
-                <Avatar className="h-10 w-10">
+                <Avatar className="h-10 w-10 flex-shrink-0">
                   <AvatarImage src={comment.profiles.avatar_url || undefined} />
                   <AvatarFallback>
                     {comment.profiles.full_name?.charAt(0).toUpperCase()}
@@ -236,9 +238,9 @@ const ListingComments = ({ listingId, onCommentAdded }: ListingCommentsProps) =>
                 </Avatar>
                 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-semibold text-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm truncate">
                         {comment.profiles.full_name}
                       </p>
                       <p className="text-xs text-gray-500">
@@ -253,7 +255,7 @@ const ListingComments = ({ listingId, onCommentAdded }: ListingCommentsProps) =>
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDeleteComment(comment.id)}
-                        className="text-gray-400 hover:text-red-600"
+                        className="text-gray-400 hover:text-red-600 flex-shrink-0"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

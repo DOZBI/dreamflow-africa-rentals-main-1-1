@@ -100,7 +100,9 @@ export const ModernChatInterface = ({ conversationId, onBack }: ModernChatInterf
   }, [messages]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   const setupConversationsSubscription = () => {
@@ -589,20 +591,21 @@ export const ModernChatInterface = ({ conversationId, onBack }: ModernChatInterf
   const otherUser = getOtherUser(selectedConversation);
 
   return (
-    <div className="flex flex-col h-screen bg-background" style={gpuStyles}>
-      {/* Header */}
-      <div className="flex-shrink-0 border-b bg-card">
-        <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex flex-col h-screen max-h-screen bg-background overflow-hidden" style={gpuStyles}>
+      {/* Header - Fixed height */}
+      <div className="flex-shrink-0 border-b bg-card h-[64px]">
+        <div className="flex items-center gap-3 px-4 py-3 h-full">
           {onBack && (
             <Button 
               variant="ghost" 
               size="icon"
               onClick={onBack}
+              className="flex-shrink-0"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
           )}
-          <Avatar className="h-10 w-10 border-2 border-background">
+          <Avatar className="h-10 w-10 border-2 border-background flex-shrink-0">
             <AvatarImage src={otherUser.avatar_url || undefined} />
             <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
               {otherUser.full_name?.charAt(0).toUpperCase()}
@@ -613,7 +616,7 @@ export const ModernChatInterface = ({ conversationId, onBack }: ModernChatInterf
             <p className="text-xs text-muted-foreground truncate">{selectedConversation.listings.title}</p>
           </div>
           
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-shrink-0">
             <Button variant="ghost" size="icon" className="h-9 w-9">
               <Phone className="h-4 w-4" />
             </Button>
@@ -662,110 +665,108 @@ export const ModernChatInterface = ({ conversationId, onBack }: ModernChatInterf
         </div>
       </div>
 
-      {/* Messages Container with GPU animations */}
-      <div className="flex-1 overflow-y-auto">
-        <ScrollArea className="h-full">
-          <div className="px-4 py-4 space-y-4">
-            {isLoading ? (
-              <motion.div 
-                variants={fadeVariants}
-                initial="hidden"
-                animate="visible"
-                style={gpuStyles}
-                className="flex items-center justify-center h-full py-12"
-              >
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
-              </motion.div>
-            ) : messages.length === 0 ? (
-              <motion.div 
-                variants={fadeVariants}
-                initial="hidden"
-                animate="visible"
-                style={gpuStyles}
-                className="flex flex-col items-center justify-center h-full py-12 text-center"
-              >
-                <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4">
-                  <svg className="w-10 h-10 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                </div>
-                <h3 className="font-semibold mb-2">Commencez la conversation</h3>
-                <p className="text-sm text-muted-foreground max-w-sm">
-                  Envoyez votre premier message pour démarrer la discussion
-                </p>
-              </motion.div>
-            ) : (
-              <AnimatePresence mode="popLayout">
-                {messages.map((message, index) => {
-                  const isCurrentUser = message.sender_id === user?.id;
-                  const showTime = index === 0 || 
-                    new Date(message.created_at).getTime() - new Date(messages[index - 1].created_at).getTime() > 300000;
-                  
-                  const isAudioMessage = message.message_type === 'audio' && message.audio_url;
-                  
-                  return (
-                    <motion.div 
-                      key={message.id}
-                      variants={slideUpVariants}
-                      initial="hidden"
-                      animate="visible"
-                      exit="exit"
-                      layout
-                      style={gpuStyles}
-                    >
-                      {showTime && (
-                        <div className="flex justify-center my-4">
-                          <Badge variant="secondary" className="text-xs">
-                            {format(new Date(message.created_at), 'HH:mm', { locale: fr })}
-                          </Badge>
-                        </div>
-                      )}
-                      <div className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
-                        <Card className={`max-w-[75%] ${isCurrentUser ? 'bg-primary text-primary-foreground' : ''}`}>
-                          <CardContent className="p-3">
-                            {isAudioMessage ? (
-                              <div className="flex items-center gap-3 min-w-[220px]">
-                                <Button
-                                  size="icon"
-                                  variant={isCurrentUser ? "secondary" : "ghost"}
-                                  onClick={() => toggleAudioPlayback(message.id, message.audio_url!)}
-                                  className="h-10 w-10 rounded-full flex-shrink-0"
-                                >
-                                  {playingAudioId === message.id ? (
-                                    <Pause className="h-4 w-4" />
-                                  ) : (
-                                    <Play className="h-4 w-4" />
-                                  )}
-                                </Button>
-                                <div className="flex-1">
-                                  <div className="h-1 bg-muted rounded-full overflow-hidden">
-                                    <div className="h-1 bg-primary w-0"></div>
-                                  </div>
+      {/* Messages Container - Scrollable with fixed height */}
+      <div className="flex-1 overflow-hidden">
+        <div className="h-full overflow-y-auto px-4 py-4 space-y-4">
+          {isLoading ? (
+            <motion.div 
+              variants={fadeVariants}
+              initial="hidden"
+              animate="visible"
+              style={gpuStyles}
+              className="flex items-center justify-center h-full"
+            >
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+            </motion.div>
+          ) : messages.length === 0 ? (
+            <motion.div 
+              variants={fadeVariants}
+              initial="hidden"
+              animate="visible"
+              style={gpuStyles}
+              className="flex flex-col items-center justify-center h-full text-center px-4"
+            >
+              <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4">
+                <svg className="w-10 h-10 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </div>
+              <h3 className="font-semibold mb-2">Commencez la conversation</h3>
+              <p className="text-sm text-muted-foreground max-w-sm">
+                Envoyez votre premier message pour démarrer la discussion
+              </p>
+            </motion.div>
+          ) : (
+            <>
+              {messages.map((message, index) => {
+                const isCurrentUser = message.sender_id === user?.id;
+                const showTime = index === 0 || 
+                  new Date(message.created_at).getTime() - new Date(messages[index - 1].created_at).getTime() > 300000;
+                
+                const isAudioMessage = message.message_type === 'audio' && message.audio_url;
+                
+                return (
+                  <motion.div 
+                    key={message.id}
+                    variants={slideUpVariants}
+                    initial="hidden"
+                    animate="visible"
+                    exit="exit"
+                    layout
+                    style={gpuStyles}
+                  >
+                    {showTime && (
+                      <div className="flex justify-center my-4">
+                        <Badge variant="secondary" className="text-xs">
+                          {format(new Date(message.created_at), 'HH:mm', { locale: fr })}
+                        </Badge>
+                      </div>
+                    )}
+                    <div className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
+                      <Card className={`max-w-[75%] ${isCurrentUser ? 'bg-primary text-primary-foreground' : ''}`}>
+                        <CardContent className="p-3">
+                          {isAudioMessage ? (
+                            <div className="flex items-center gap-3 min-w-[220px]">
+                              <Button
+                                size="icon"
+                                variant={isCurrentUser ? "secondary" : "ghost"}
+                                onClick={() => toggleAudioPlayback(message.id, message.audio_url!)}
+                                className="h-10 w-10 rounded-full flex-shrink-0"
+                              >
+                                {playingAudioId === message.id ? (
+                                  <Pause className="h-4 w-4" />
+                                ) : (
+                                  <Play className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <div className="flex-1">
+                                <div className="h-1 bg-muted rounded-full overflow-hidden">
+                                  <div className="h-1 bg-primary w-0"></div>
                                 </div>
                               </div>
-                            ) : (
-                              <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                                {message.content}
-                              </p>
-                            )}
-                            <p className={`text-xs mt-2 ${isCurrentUser ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                              {format(new Date(message.created_at), 'HH:mm', { locale: fr })}
+                            </div>
+                          ) : (
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                              {message.content}
                             </p>
-                          </CardContent>
-                        </Card>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-                <div ref={messagesEndRef} />
-              </AnimatePresence>
-            )}
-          </div>
-        </ScrollArea>
+                          )}
+                          <p className={`text-xs mt-2 ${isCurrentUser ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                            {format(new Date(message.created_at), 'HH:mm', { locale: fr })}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </motion.div>
+                );
+              })}
+              <div ref={messagesEndRef} className="h-4" />
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Input Container */}
-      <div className="flex-shrink-0">
+      {/* Input Container - Fixed at bottom */}
+      <div className="flex-shrink-0 border-t bg-card">
         <ModernChatInput
           onSendMessage={sendMessage}
           onSendVoice={sendVoiceMessage}
