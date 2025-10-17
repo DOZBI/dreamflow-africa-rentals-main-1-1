@@ -4,13 +4,12 @@
  */
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { generateSubscriptionToken, verifySubscriptionToken, isTokenExpired } from '../api/utils/jwt';
 import { supabase } from '../integrations/supabase/client';
 
 interface SMSAuthState {
   isAuthenticated: boolean;
   numero: string | null;
-  token: string | null;
+  code: string | null;
   expiresAt: Date | null;
   remainingMinutes: number;
 }
@@ -23,7 +22,7 @@ interface SMSAuthContextType extends SMSAuthState {
 
 const SMSAuthContext = createContext<SMSAuthContextType | undefined>(undefined);
 
-const TOKEN_STORAGE_KEY = 'sms_auth_token';
+const CODE_STORAGE_KEY = 'sms_auth_code';
 const NUMERO_STORAGE_KEY = 'sms_auth_numero';
 const EXPIRES_AT_STORAGE_KEY = 'sms_auth_expires_at';
 
@@ -31,15 +30,14 @@ export function SMSAuthProvider({ children }: { children: ReactNode }) {
   const [authState, setAuthState] = useState<SMSAuthState>({
     isAuthenticated: false,
     numero: null,
-    token: null,
+    code: null,
     expiresAt: null,
     remainingMinutes: 0,
   });
 
-  // Check token validity
   const checkTokenValidity = (): boolean => {
-    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
-    if (!token) return false;
+    const code = localStorage.getItem(CODE_STORAGE_KEY);
+    if (!code) return false;
 
     const expiresAtStr = localStorage.getItem(EXPIRES_AT_STORAGE_KEY);
     if (!expiresAtStr) return false;
@@ -47,7 +45,7 @@ export function SMSAuthProvider({ children }: { children: ReactNode }) {
     const expiresAt = new Date(expiresAtStr);
     const now = new Date();
 
-    if (expiresAt <= now || isTokenExpired(token)) {
+    if (expiresAt <= now) {
       logout();
       return false;
     }
@@ -55,17 +53,14 @@ export function SMSAuthProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
-  // Calculate remaining minutes
   const calculateRemainingMinutes = (expiresAt: Date): number => {
     const now = new Date();
     const remaining = Math.floor((expiresAt.getTime() - now.getTime()) / (1000 * 60));
     return Math.max(0, remaining);
   };
 
-  // Login with phone number and subscription code
   const login = async (numero: string, code: string): Promise<{ success: boolean; message: string }> => {
     try {
-      // Validate input
       if (!numero || !code) {
         return {
           success: false,
@@ -73,7 +68,6 @@ export function SMSAuthProvider({ children }: { children: ReactNode }) {
         };
       }
 
-      // Query subscription from database
       const { data: subscription, error: dbError } = await supabase
         .from('abonnements')
         .select('*')
@@ -88,7 +82,6 @@ export function SMSAuthProvider({ children }: { children: ReactNode }) {
         };
       }
 
-      // Check if subscription is active
       if (subscription.statut !== 'actif' && subscription.statut !== 'utilisé') {
         return {
           success: false,
@@ -96,12 +89,10 @@ export function SMSAuthProvider({ children }: { children: ReactNode }) {
         };
       }
 
-      // Check if subscription is expired
       const now = new Date();
       const expirationDate = new Date(subscription.date_expiration);
 
       if (expirationDate < now) {
-        // Update status to expired
         await supabase
           .from('abonnements')
           .update({ statut: 'expiré' })
@@ -113,7 +104,6 @@ export function SMSAuthProvider({ children }: { children: ReactNode }) {
         };
       }
 
-      // Mark subscription as used if it's the first time being validated
       if (subscription.statut === 'actif') {
         await supabase
           .from('abonnements')
@@ -121,69 +111,30 @@ export function SMSAuthProvider({ children }: { children: ReactNode }) {
           .eq('id', subscription.id);
       }
 
-      // Sign in to Supabase Auth (create user if needed)
-      const email = `${numero.replace(/\+/g, '')}@sms.local`;
-      const password = `${numero}_${code}`;
-
-      // Try to sign in first
-      let authResult = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      // If user doesn't exist, create one
-      if (authResult.error && authResult.error.message.includes('Invalid login credentials')) {
-        const signUpResult = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: numero,
-              phone_number: numero,
-            }
-          }
+      // Créer ou mettre à jour le profil basé sur le code d'abonnement
+      const { error: profileError } = await supabase
+        .from('subscription_profiles')
+        .upsert({
+          code: subscription.code,
+          numero: subscription.numero,
+          full_name: `Utilisateur ${subscription.code}`,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'code'
         });
 
-        if (signUpResult.error) {
-          console.error('Error creating Supabase user:', signUpResult.error);
-          return {
-            success: false,
-            message: 'Erreur lors de la création du compte',
-          };
-        }
-
-        // Sign in after creating user
-        authResult = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+      if (profileError) {
+        console.error('Error creating/updating profile:', profileError);
       }
 
-      if (authResult.error) {
-        console.error('Supabase auth error:', authResult.error);
-        return {
-          success: false,
-          message: 'Erreur d\'authentification',
-        };
-      }
-
-      // Generate access token
-      const token = generateSubscriptionToken(
-        subscription.numero,
-        subscription.code,
-        expirationDate
-      );
-
-      // Store authentication data
-      localStorage.setItem(TOKEN_STORAGE_KEY, token);
+      localStorage.setItem(CODE_STORAGE_KEY, subscription.code);
       localStorage.setItem(NUMERO_STORAGE_KEY, subscription.numero);
       localStorage.setItem(EXPIRES_AT_STORAGE_KEY, expirationDate.toISOString());
 
-      // Update state
       setAuthState({
         isAuthenticated: true,
         numero: subscription.numero,
-        token,
+        code: subscription.code,
         expiresAt: expirationDate,
         remainingMinutes: calculateRemainingMinutes(expirationDate),
       });
@@ -201,39 +152,34 @@ export function SMSAuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Logout
-  const logout = async () => {
-    // Sign out from Supabase
-    await supabase.auth.signOut();
-
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
+  const logout = () => {
+    localStorage.removeItem(CODE_STORAGE_KEY);
     localStorage.removeItem(NUMERO_STORAGE_KEY);
     localStorage.removeItem(EXPIRES_AT_STORAGE_KEY);
 
     setAuthState({
       isAuthenticated: false,
       numero: null,
-      token: null,
+      code: null,
       expiresAt: null,
       remainingMinutes: 0,
     });
   };
 
-  // Initialize auth state from localStorage
   useEffect(() => {
-    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    const code = localStorage.getItem(CODE_STORAGE_KEY);
     const numero = localStorage.getItem(NUMERO_STORAGE_KEY);
     const expiresAtStr = localStorage.getItem(EXPIRES_AT_STORAGE_KEY);
 
-    if (token && numero && expiresAtStr) {
+    if (code && numero && expiresAtStr) {
       const expiresAt = new Date(expiresAtStr);
       const now = new Date();
 
-      if (expiresAt > now && !isTokenExpired(token)) {
+      if (expiresAt > now) {
         setAuthState({
           isAuthenticated: true,
           numero,
-          token,
+          code,
           expiresAt,
           remainingMinutes: calculateRemainingMinutes(expiresAt),
         });
@@ -243,7 +189,6 @@ export function SMSAuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Auto-logout when token expires
   useEffect(() => {
     if (!authState.expiresAt) return;
 
@@ -251,13 +196,12 @@ export function SMSAuthProvider({ children }: { children: ReactNode }) {
       if (!checkTokenValidity()) {
         clearInterval(checkInterval);
       } else {
-        // Update remaining minutes
         setAuthState(prev => ({
           ...prev,
           remainingMinutes: calculateRemainingMinutes(prev.expiresAt!),
         }));
       }
-    }, 60000); // Check every minute
+    }, 60000);
 
     return () => clearInterval(checkInterval);
   }, [authState.expiresAt]);

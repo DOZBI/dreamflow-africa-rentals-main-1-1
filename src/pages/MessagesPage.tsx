@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { ModernChatInterface } from '@/components/chat/ModernChatInterface';
+import { useSMSAuth } from '@/contexts/SMSAuthContext';
+import { SubscriptionChatInterface } from '@/components/chat/SubscriptionChatInterface';
 import { MessageCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -10,8 +10,8 @@ import { useSearchParams } from 'react-router-dom';
 
 interface Conversation {
   id: string;
-  buyer_id: string;
-  seller_id: string;
+  buyer_code: string;
+  seller_code: string;
   listing_id: string;
   updated_at: string;
   listings: {
@@ -36,38 +36,31 @@ export const MessagesPage = () => {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { code } = useSMSAuth();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user) {
+    if (code) {
       fetchConversations();
       setupRealtimeSubscription();
       
       const listingId = searchParams.get('listing');
-      if (listingId) {
-        createOrFindConversationForListing(listingId);
+      const sellerCode = searchParams.get('seller');
+      if (listingId && sellerCode) {
+        createOrFindConversationForListing(listingId, sellerCode);
       }
     }
     
     return () => {
       // Cleanup handled by Supabase
     };
-  }, [user]);
+  }, [code]);
 
-  const createOrFindConversationForListing = async (listingId: string) => {
-    if (!user) return;
+  const createOrFindConversationForListing = async (listingId: string, sellerCode: string) => {
+    if (!code) return;
 
     try {
-      const { data: listing, error: listingError } = await supabase
-        .from('listings')
-        .select('id, user_id')
-        .eq('id', listingId)
-        .single();
-
-      if (listingError) throw listingError;
-
-      if (listing.user_id === user.id) {
+      if (sellerCode === code) {
         toast({
           title: "Erreur",
           description: "Vous ne pouvez pas contacter votre propre annonce",
@@ -78,11 +71,11 @@ export const MessagesPage = () => {
       }
 
       const { data: existingConv, error: checkError } = await supabase
-        .from('conversations')
+        .from('subscription_conversations')
         .select('id')
         .eq('listing_id', listingId)
-        .eq('buyer_id', user.id)
-        .eq('seller_id', listing.user_id)
+        .eq('buyer_code', code)
+        .eq('seller_code', sellerCode)
         .maybeSingle();
 
       if (checkError) throw checkError;
@@ -92,11 +85,11 @@ export const MessagesPage = () => {
         setSearchParams({});
       } else {
         const { data: newConv, error: createError } = await supabase
-          .from('conversations')
+          .from('subscription_conversations')
           .insert({
             listing_id: listingId,
-            buyer_id: user.id,
-            seller_id: listing.user_id,
+            buyer_code: code,
+            seller_code: sellerCode,
           })
           .select('id')
           .single();
@@ -127,27 +120,27 @@ export const MessagesPage = () => {
   const fetchConversations = async () => {
     try {
       const { data, error } = await supabase
-        .from('conversations')
+        .from('subscription_conversations')
         .select(`
           id,
-          buyer_id,
-          seller_id,
+          buyer_code,
+          seller_code,
           listing_id,
           updated_at,
           created_at,
-          listings!conversations_listing_id_fkey (
+          listings!subscription_conversations_listing_id_fkey (
             title
           ),
-          buyer_profile:profiles!conversations_buyer_id_fkey (
+          buyer_profile:subscription_profiles!subscription_conversations_buyer_code_fkey (
             full_name,
             avatar_url
           ),
-          seller_profile:profiles!conversations_seller_id_fkey (
+          seller_profile:subscription_profiles!subscription_conversations_seller_code_fkey (
             full_name,
             avatar_url
           )
         `)
-        .or(`buyer_id.eq.${user?.id},seller_id.eq.${user?.id}`)
+        .or(`buyer_code.eq.${code},seller_code.eq.${code}`)
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
@@ -155,7 +148,7 @@ export const MessagesPage = () => {
       const conversationsWithMessages = await Promise.all(
         (data || []).map(async (conv) => {
           const { data: lastMsg } = await supabase
-            .from('messages')
+            .from('subscription_messages')
             .select('content, created_at')
             .eq('conversation_id', conv.id)
             .order('created_at', { ascending: false })
@@ -184,13 +177,13 @@ export const MessagesPage = () => {
 
   const setupRealtimeSubscription = () => {
     const conversationsChannel = supabase
-      .channel('user_conversations_page')
+      .channel('subscription_user_conversations_page')
       .on('postgres_changes', 
         { 
           event: '*', 
           schema: 'public', 
-          table: 'conversations',
-          filter: `buyer_id=eq.${user?.id}`
+          table: 'subscription_conversations',
+          filter: `buyer_code=eq.${code}`
         },
         () => {
           fetchConversations();
@@ -200,8 +193,8 @@ export const MessagesPage = () => {
         { 
           event: '*', 
           schema: 'public', 
-          table: 'conversations',
-          filter: `seller_id=eq.${user?.id}`
+          table: 'subscription_conversations',
+          filter: `seller_code=eq.${code}`
         },
         () => {
           fetchConversations();
@@ -211,7 +204,7 @@ export const MessagesPage = () => {
         { 
           event: 'INSERT', 
           schema: 'public', 
-          table: 'messages'
+          table: 'subscription_messages'
         },
         () => {
           fetchConversations();
@@ -225,7 +218,7 @@ export const MessagesPage = () => {
   };
 
   const getOtherUser = (conversation: Conversation) => {
-    if (user?.id === conversation.buyer_id) {
+    if (code === conversation.buyer_code) {
       return conversation.seller_profile;
     }
     return conversation.buyer_profile;
@@ -242,7 +235,7 @@ export const MessagesPage = () => {
   if (selectedConversationId) {
     return (
       <div className="h-screen overflow-hidden">
-        <ModernChatInterface
+        <SubscriptionChatInterface
           conversationId={selectedConversationId}
           onBack={() => setSelectedConversationId(null)}
         />
