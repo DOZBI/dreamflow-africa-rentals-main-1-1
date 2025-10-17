@@ -4,7 +4,8 @@
  */
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { verifySubscriptionToken, isTokenExpired } from '../api/utils/jwt';
+import { generateSubscriptionToken, verifySubscriptionToken, isTokenExpired } from '../api/utils/jwt';
+import { supabase } from '../integrations/supabase/client';
 
 interface SMSAuthState {
   isAuthenticated: boolean;
@@ -64,39 +65,81 @@ export function SMSAuthProvider({ children }: { children: ReactNode }) {
   // Login with phone number and subscription code
   const login = async (numero: string, code: string): Promise<{ success: boolean; message: string }> => {
     try {
-      // Call validate-code API
-      const response = await fetch('/api/validate-code', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ numero, code }),
-      });
-
-      const result = await response.json();
-
-      if (!result.success) {
+      // Validate input
+      if (!numero || !code) {
         return {
           success: false,
-          message: result.message || 'Code invalide',
+          message: 'Numéro de téléphone et code requis',
         };
       }
 
-      const { token, date_expiration, numero: validatedNumero } = result.data;
-      const expiresAt = new Date(date_expiration);
+      // Query subscription from database
+      const { data: subscription, error: dbError } = await supabase
+        .from('abonnements')
+        .select('*')
+        .eq('numero', numero)
+        .eq('code', code)
+        .single();
+
+      if (dbError || !subscription) {
+        return {
+          success: false,
+          message: 'Code invalide ou introuvable',
+        };
+      }
+
+      // Check if subscription is active
+      if (subscription.statut !== 'actif' && subscription.statut !== 'utilisé') {
+        return {
+          success: false,
+          message: `Abonnement ${subscription.statut}`,
+        };
+      }
+
+      // Check if subscription is expired
+      const now = new Date();
+      const expirationDate = new Date(subscription.date_expiration);
+
+      if (expirationDate < now) {
+        // Update status to expired
+        await supabase
+          .from('abonnements')
+          .update({ statut: 'expiré' })
+          .eq('id', subscription.id);
+
+        return {
+          success: false,
+          message: 'Code expiré',
+        };
+      }
+
+      // Mark subscription as used if it's the first time being validated
+      if (subscription.statut === 'actif') {
+        await supabase
+          .from('abonnements')
+          .update({ statut: 'utilisé' })
+          .eq('id', subscription.id);
+      }
+
+      // Generate access token
+      const token = generateSubscriptionToken(
+        subscription.numero,
+        subscription.code,
+        expirationDate
+      );
 
       // Store authentication data
       localStorage.setItem(TOKEN_STORAGE_KEY, token);
-      localStorage.setItem(NUMERO_STORAGE_KEY, validatedNumero);
-      localStorage.setItem(EXPIRES_AT_STORAGE_KEY, expiresAt.toISOString());
+      localStorage.setItem(NUMERO_STORAGE_KEY, subscription.numero);
+      localStorage.setItem(EXPIRES_AT_STORAGE_KEY, expirationDate.toISOString());
 
       // Update state
       setAuthState({
         isAuthenticated: true,
-        numero: validatedNumero,
+        numero: subscription.numero,
         token,
-        expiresAt,
-        remainingMinutes: calculateRemainingMinutes(expiresAt),
+        expiresAt: expirationDate,
+        remainingMinutes: calculateRemainingMinutes(expirationDate),
       });
 
       return {
