@@ -5,7 +5,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { SMSAuthProvider, useSMSAuth } from "@/contexts/SMSAuthContext";
 import EnhancedAuthPage from "@/components/auth/EnhancedAuthPage";
+import { SMSLoginForm } from "@/components/auth/SMSLoginForm";
 import MarketplaceFeed from "@/components/marketplace/MarketplaceFeed";
 import CreateListingPage from "@/components/marketplace/CreateListingPage";
 import ProfilePage from "@/components/profile/ProfilePage";
@@ -19,28 +21,30 @@ import HoverReceiver from "@/visual-edits/VisualEditsMessenger";
 const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useAuth();
+  const { isAuthenticated } = useSMSAuth();
   
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-  
-  return user ? <>{children}</> : <Navigate to="/auth" replace />;
+  return isAuthenticated ? <>{children}</> : <Navigate to="/auth" replace />;
 };
 
 const AppRoutes = () => {
-  const { user } = useAuth();
+  const { isAuthenticated } = useSMSAuth();
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Routes>
-        <Route path="/auth" element={<EnhancedAuthPage />} />
-        <Route path="/" element={<MarketplaceFeed />} />
-        <Route path="/listing/:id" element={<ListingDetailPage />} />
+        <Route path="/auth" element={
+          isAuthenticated ? <Navigate to="/" replace /> : <SMSLoginForm />
+        } />
+        <Route path="/" element={
+          <ProtectedRoute>
+            <MarketplaceFeed />
+          </ProtectedRoute>
+        } />
+        <Route path="/listing/:id" element={
+          <ProtectedRoute>
+            <ListingDetailPage />
+          </ProtectedRoute>
+        } />
         <Route path="/create" element={
           <ProtectedRoute>
             <CreateListingPage />
@@ -64,7 +68,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         } />
       </Routes>
-      {user && <MobileNavigation />}
+      {isAuthenticated && <MobileNavigation />}
     </div>
   );
 };
@@ -77,7 +81,9 @@ const App = () => (
       <HoverReceiver />
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
+          <SMSAuthProvider>
+            <AppRoutes />
+          </SMSAuthProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

@@ -121,6 +121,52 @@ export function SMSAuthProvider({ children }: { children: ReactNode }) {
           .eq('id', subscription.id);
       }
 
+      // Sign in to Supabase Auth (create user if needed)
+      const email = `${numero.replace(/\+/g, '')}@sms.local`;
+      const password = `${numero}_${code}`;
+
+      // Try to sign in first
+      let authResult = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      // If user doesn't exist, create one
+      if (authResult.error && authResult.error.message.includes('Invalid login credentials')) {
+        const signUpResult = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: numero,
+              phone_number: numero,
+            }
+          }
+        });
+
+        if (signUpResult.error) {
+          console.error('Error creating Supabase user:', signUpResult.error);
+          return {
+            success: false,
+            message: 'Erreur lors de la création du compte',
+          };
+        }
+
+        // Sign in after creating user
+        authResult = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+      }
+
+      if (authResult.error) {
+        console.error('Supabase auth error:', authResult.error);
+        return {
+          success: false,
+          message: 'Erreur d\'authentification',
+        };
+      }
+
       // Generate access token
       const token = generateSubscriptionToken(
         subscription.numero,
@@ -156,7 +202,10 @@ export function SMSAuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Logout
-  const logout = () => {
+  const logout = async () => {
+    // Sign out from Supabase
+    await supabase.auth.signOut();
+
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     localStorage.removeItem(NUMERO_STORAGE_KEY);
     localStorage.removeItem(EXPIRES_AT_STORAGE_KEY);
