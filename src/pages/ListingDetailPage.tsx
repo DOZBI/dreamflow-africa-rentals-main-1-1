@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useSMSAuth } from '@/contexts/SMSAuthContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthAction } from '@/hooks/useAuthAction';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,7 +36,7 @@ interface ListingDetail {
   price: number;
   location: string;
   created_at: string;
-  subscription_code: string;
+  user_id: string;
   category_id: string | null;
   bedrooms: number | null;
   living_rooms: number | null;
@@ -60,7 +59,6 @@ interface ListingDetail {
 const ListingDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { code, isAuthenticated } = useSMSAuth();
   const { user } = useAuth();
   const { executeAction, showLoginPrompt, currentAction, closeLoginPrompt } = useAuthAction();
   const { toast } = useToast();
@@ -73,11 +71,11 @@ const ListingDetailPage = () => {
     if (id) {
       fetchListingDetail();
     }
-  }, [id, code]);
+  }, [id, user]);
 
   // Real-time subscription for favorites
   useEffect(() => {
-    if (!id || !code) return;
+    if (!id || !user) return;
 
     const favoritesChannel = supabase
       .channel(`listing_${id}_favorites`)
@@ -91,18 +89,18 @@ const ListingDetailPage = () => {
         },
         async (payload) => {
           if (payload.eventType === 'INSERT') {
-            const newFavorite = payload.new as { subscription_code: string };
+            const newFavorite = payload.new as { user_id: string };
             setListing(prev => prev ? {
               ...prev,
               favorites_count: prev.favorites_count + 1,
-              is_favorite: newFavorite.subscription_code === code ? true : prev.is_favorite,
+              is_favorite: newFavorite.user_id === user.id ? true : prev.is_favorite,
             } : null);
           } else if (payload.eventType === 'DELETE') {
-            const deletedFavorite = payload.old as { subscription_code: string };
+            const deletedFavorite = payload.old as { user_id: string };
             setListing(prev => prev ? {
               ...prev,
               favorites_count: Math.max(0, prev.favorites_count - 1),
-              is_favorite: deletedFavorite.subscription_code === code ? false : prev.is_favorite,
+              is_favorite: deletedFavorite.user_id === user.id ? false : prev.is_favorite,
             } : null);
           }
         }
@@ -112,7 +110,7 @@ const ListingDetailPage = () => {
     return () => {
       supabase.removeChannel(favoritesChannel);
     };
-  }, [id, code]);
+  }, [id, user]);
 
   const fetchListingDetail = async () => {
     if (!id) return;
@@ -124,7 +122,7 @@ const ListingDetailPage = () => {
         .from('listings')
         .select(`
           *,
-          profile:subscription_profiles!listings_subscription_code_fkey(full_name, avatar_url),
+          profile:profiles!listings_user_id_fkey(full_name, avatar_url),
           category:categories(name, icon)
         `)
         .eq('id', id)
@@ -153,12 +151,12 @@ const ListingDetailPage = () => {
         .eq('listing_id', id);
 
       let isFavorite = false;
-      if (code) {
+      if (user) {
         const { data: favoriteData } = await supabase
           .from('favorites')
           .select('id')
           .eq('listing_id', id)
-          .eq('subscription_code', code)
+          .eq('user_id', user.id)
           .limit(1)
           .single();
         isFavorite = !!favoriteData;
@@ -189,7 +187,7 @@ const ListingDetailPage = () => {
   };
 
   const handleFavorite = async () => {
-    if (!code || !listing) {
+    if (!user || !listing) {
       executeAction('favorite', () => {});
       return;
     }
@@ -207,11 +205,11 @@ const ListingDetailPage = () => {
           .from('favorites')
           .delete()
           .eq('listing_id', listing.id)
-          .eq('subscription_code', code);
+          .eq('user_id', user.id);
       } else {
         await supabase
           .from('favorites')
-          .insert({ listing_id: listing.id, subscription_code: code });
+          .insert({ listing_id: listing.id, user_id: user.id });
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
@@ -224,11 +222,11 @@ const ListingDetailPage = () => {
   };
 
   const handleContact = () => {
-    if (!code || !listing) {
+    if (!user || !listing) {
       executeAction('contact', () => {});
       return;
     }
-    navigate(`/messages?listing=${listing.id}&seller=${listing.subscription_code}`);
+    navigate(`/messages?listing=${listing.id}`);
   };
 
   const handleShare = () => {
@@ -496,7 +494,7 @@ const ListingDetailPage = () => {
             size="lg"
             className="flex-1 bg-green-500 hover:bg-green-600 text-white"
             onClick={handleContact}
-            disabled={code === listing.subscription_code}
+            disabled={user?.id === listing.user_id}
           >
             <Phone className="h-5 w-5 mr-2" />
             Contacter

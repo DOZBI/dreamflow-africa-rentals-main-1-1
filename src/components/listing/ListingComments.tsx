@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useSMSAuth } from '@/contexts/SMSAuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,7 +14,7 @@ interface Comment {
   id: string;
   content: string;
   created_at: string;
-  subscription_code: string;
+  user_id: string;
   profiles: {
     full_name: string;
     avatar_url: string | null;
@@ -31,7 +31,7 @@ const ListingComments = ({ listingId, onCommentAdded }: ListingCommentsProps) =>
   const [newComment, setNewComment] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { code, isAuthenticated } = useSMSAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -54,8 +54,8 @@ const ListingComments = ({ listingId, onCommentAdded }: ListingCommentsProps) =>
               id,
               content,
               created_at,
-              subscription_code,
-              profiles:subscription_profiles!listing_comments_subscription_code_fkey (
+              user_id,
+              profiles!listing_comments_user_id_fkey (
                 full_name,
                 avatar_url
               )
@@ -96,8 +96,8 @@ const ListingComments = ({ listingId, onCommentAdded }: ListingCommentsProps) =>
           id,
           content,
           created_at,
-          subscription_code,
-          profiles:subscription_profiles!listing_comments_subscription_code_fkey (
+          user_id,
+          profiles!listing_comments_user_id_fkey (
             full_name,
             avatar_url
           )
@@ -122,7 +122,7 @@ const ListingComments = ({ listingId, onCommentAdded }: ListingCommentsProps) =>
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!code || !isAuthenticated || !newComment.trim()) return;
+    if (!user || !newComment.trim()) return;
 
     setIsSubmitting(true);
 
@@ -131,7 +131,7 @@ const ListingComments = ({ listingId, onCommentAdded }: ListingCommentsProps) =>
         .from('listing_comments')
         .insert({
           listing_id: listingId,
-          subscription_code: code,
+          user_id: user.id,
           content: newComment.trim(),
         });
 
@@ -162,7 +162,7 @@ const ListingComments = ({ listingId, onCommentAdded }: ListingCommentsProps) =>
         .from('listing_comments')
         .delete()
         .eq('id', commentId)
-        .eq('subscription_code', code);
+        .eq('user_id', user?.id);
 
       if (error) throw error;
 
@@ -189,7 +189,7 @@ const ListingComments = ({ listingId, onCommentAdded }: ListingCommentsProps) =>
         </div>
       </div>
 
-      {isAuthenticated && code && (
+      {user && (
         <form onSubmit={handleSubmitComment} className="flex-shrink-0 space-y-3 mb-4">
           <Textarea
             value={newComment}
@@ -250,7 +250,7 @@ const ListingComments = ({ listingId, onCommentAdded }: ListingCommentsProps) =>
                         })}
                       </p>
                     </div>
-                    {code === comment.subscription_code && (
+                    {user?.id === comment.user_id && (
                       <Button
                         variant="ghost"
                         size="sm"
