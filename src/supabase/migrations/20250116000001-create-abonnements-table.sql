@@ -17,9 +17,9 @@ CREATE INDEX IF NOT EXISTS idx_abonnements_statut ON abonnements(statut);
 
 -- Insertion de 3 codes permanents pour administrateurs (expiration dans 100 ans)
 INSERT INTO abonnements (numero, code, montant, duree, date_expiration, statut) VALUES
-  ('ADMIN', 'ADMIN001', 99999, 52560000, NOW() + INTERVAL '100 years', 'actif'),
-  ('ADMIN', 'ADMIN002', 99999, 52560000, NOW() + INTERVAL '100 years', 'actif'),
-  ('ADMIN', 'ADMIN003', 99999, 52560000, NOW() + INTERVAL '100 years', 'actif');
+  ('+241065119788', '000001', 99999, 52560000, NOW() + INTERVAL '100 years', 'actif'),
+  ('+241065119788', '000002', 99999, 52560000, NOW() + INTERVAL '100 years', 'actif'),
+  ('+241065119788', '000003', 99999, 52560000, NOW() + INTERVAL '100 years', 'actif');
 
 -- Commentaires
 COMMENT ON TABLE abonnements IS 'Table pour gérer les abonnements par SMS avec codes de validation';
