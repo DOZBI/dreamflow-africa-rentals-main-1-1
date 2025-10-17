@@ -1,90 +1,83 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useSMSAuth } from './contexts/SMSAuthContext';
-import MobileNavigation from './components/navigation/MobileNavigation';
-import SMSLoginPage from './pages/SMSLoginPage';
 import Index from './pages/Index';
+import MobilePage from './pages/MobilePage';
 import ListingDetailPage from './pages/ListingDetailPage';
-import MessagesPage from './pages/MessagesPage';
 import FavoritesPage from './pages/FavoritesPage';
+import MessagesPage from './pages/MessagesPage';
 import VideoFeedPage from './pages/VideoFeedPage';
 import NotFound from './pages/NotFound';
 
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+// Protected Route wrapper
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useSMSAuth();
   
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
+  
+  return <>{children}</>;
+}
 
-  return (
-    <>
-      {children}
-      <MobileNavigation />
-    </>
-  );
-};
-
-export const AppRoutes = () => {
+export default function AppRoutes() {
   const { isAuthenticated } = useSMSAuth();
-
+  
   return (
     <Routes>
-      {/* Public route - Login */}
+      {/* Public route - Login page */}
       <Route 
         path="/login" 
-        element={isAuthenticated ? <Navigate to="/" replace /> : <SMSLoginPage />} 
+        element={isAuthenticated ? <Navigate to="/" replace /> : <MobilePage />} 
       />
-
+      
       {/* Protected routes */}
-      <Route
-        path="/"
+      <Route 
+        path="/" 
         element={
           <ProtectedRoute>
             <Index />
           </ProtectedRoute>
-        }
+        } 
       />
       
-      <Route
-        path="/listing/:id"
+      <Route 
+        path="/listing/:id" 
         element={
           <ProtectedRoute>
             <ListingDetailPage />
           </ProtectedRoute>
-        }
+        } 
       />
       
-      <Route
-        path="/messages"
-        element={
-          <ProtectedRoute>
-            <MessagesPage />
-          </ProtectedRoute>
-        }
-      />
-      
-      <Route
-        path="/favorites"
+      <Route 
+        path="/favorites" 
         element={
           <ProtectedRoute>
             <FavoritesPage />
           </ProtectedRoute>
-        }
+        } 
       />
       
-      <Route
-        path="/videos"
+      <Route 
+        path="/messages" 
+        element={
+          <ProtectedRoute>
+            <MessagesPage />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/videos" 
         element={
           <ProtectedRoute>
             <VideoFeedPage />
           </ProtectedRoute>
-        }
+        } 
       />
-
-      {/* 404 - Not Found */}
+      
+      {/* 404 page */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
-};
-
-export default AppRoutes;
+}
