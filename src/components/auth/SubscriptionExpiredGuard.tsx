@@ -9,10 +9,8 @@ export const SubscriptionExpiredGuard = ({ children }: { children: React.ReactNo
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/mobile', { replace: true });
-      return;
-    }
+    // Ne vérifier que si l'utilisateur est authentifié
+    if (!isAuthenticated) return;
 
     // Vérifier immédiatement
     if (!checkTokenValidity()) {
@@ -21,7 +19,7 @@ export const SubscriptionExpiredGuard = ({ children }: { children: React.ReactNo
         description: "Votre abonnement a expiré. Veuillez vous reconnecter.",
         variant: "destructive",
       });
-      navigate('/mobile', { replace: true });
+      navigate('/login', { replace: true });
       return;
     }
 
@@ -33,7 +31,7 @@ export const SubscriptionExpiredGuard = ({ children }: { children: React.ReactNo
           description: "Votre abonnement a expiré. Veuillez vous reconnecter.",
           variant: "destructive",
         });
-        navigate('/mobile', { replace: true });
+        navigate('/login', { replace: true });
       }
     }, 30000);
 
@@ -42,7 +40,7 @@ export const SubscriptionExpiredGuard = ({ children }: { children: React.ReactNo
 
   // Afficher un avertissement 10 minutes avant l'expiration
   useEffect(() => {
-    if (!expiresAt) return;
+    if (!expiresAt || !isAuthenticated) return;
 
     const checkWarning = () => {
       const now = new Date();
@@ -74,11 +72,8 @@ export const SubscriptionExpiredGuard = ({ children }: { children: React.ReactNo
     checkWarning();
 
     return () => clearInterval(interval);
-  }, [expiresAt, toast]);
+  }, [expiresAt, isAuthenticated, toast]);
 
-  if (!isAuthenticated) {
-    return null;
-  }
-
+  // Toujours rendre les enfants - laisser AppRoutes gérer la protection
   return <>{children}</>;
 };
