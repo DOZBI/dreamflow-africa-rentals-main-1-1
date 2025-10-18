@@ -127,6 +127,7 @@ export const useMarketplace = () => {
   }) => {
     try {
       setLoading(true);
+      console.log('🔍 Fetching listings...');
       
       let query = supabase
         .from('listings')
@@ -155,22 +156,37 @@ export const useMarketplace = () => {
       }
 
       const { data, error } = await query;
-      if (error) throw error;
-
-      const listingIds = (data || []).map(l => l.id);
-      let allMedia: any[] = [];
-      if (listingIds.length > 0) {
-        const { data: mediaData, error: mediaError } = await supabase
-          .from('listing_media')
-          .select('listing_id, media_url, media_type, order')
-          .in('listing_id', listingIds)
-          .order('order', { ascending: true });
-        if (mediaError) throw mediaError;
-        allMedia = mediaData || [];
+      
+      if (error) {
+        console.error('❌ Error fetching listings:', error);
+        throw error;
       }
 
-      const listingsWithExtras = await Promise.all(
-        (data || []).map(async (listing) => {
+      console.log('✅ Fetched listings:', data?.length || 0);
+
+      if (!data || data.length === 0) {
+        setListings([]);
+        return;
+      }
+
+      const listingIds = data.map(l => l.id);
+      
+      // Fetch all media
+      const { data: mediaData, error: mediaError } = await supabase
+        .from('listing_media')
+        .select('listing_id, media_url, media_type, order')
+        .in('listing_id', listingIds)
+        .order('order', { ascending: true });
+
+      if (mediaError) {
+        console.error('❌ Error fetching media:', mediaError);
+      }
+
+      const allMedia = mediaData || [];
+
+      // Fetch all favorites counts and user favorites in parallel
+      const favoritesPromises = data.map(async (listing) => {
+        try {
           const { count: favoritesCount } = await supabase
             .from('favorites')
             .select('*', { count: 'exact', head: true })
@@ -183,43 +199,69 @@ export const useMarketplace = () => {
               .select('id')
               .eq('listing_id', listing.id)
               .eq('user_id', user.id)
-              .limit(1) 
-              .single();
+              .maybeSingle();
             isFavorite = !!favoriteData;
           }
 
+          return { listingId: listing.id, favoritesCount: favoritesCount || 0, isFavorite };
+        } catch (err) {
+          console.error('❌ Error fetching favorites for listing:', listing.id, err);
+          return { listingId: listing.id, favoritesCount: 0, isFavorite: false };
+        }
+      });
+
+      // Fetch all comments counts in parallel
+      const commentsPromises = data.map(async (listing) => {
+        try {
           const { count: commentsCount } = await supabase
             .from('listing_comments')
             .select('*', { count: 'exact', head: true })
             .eq('listing_id', listing.id);
-          
-          const media = allMedia
-            .filter(m => m.listing_id === listing.id)
-            .map(m => ({ url: m.media_url, type: m.media_type as 'image' | 'video' }));
+          return { listingId: listing.id, commentsCount: commentsCount || 0 };
+        } catch (err) {
+          console.error('❌ Error fetching comments for listing:', listing.id, err);
+          return { listingId: listing.id, commentsCount: 0 };
+        }
+      });
 
-          if (media.length === 0 && listing.media_url) {
-            media.push({ url: listing.media_url, type: listing.media_type as 'image' | 'video' });
-          }
+      const favoritesResults = await Promise.all(favoritesPromises);
+      const commentsResults = await Promise.all(commentsPromises);
 
-          return {
-            ...listing,
-            is_favorite: isFavorite,
-            favorites_count: favoritesCount || 0,
-            comments_count: commentsCount || 0,
-            media_type: listing.media_type as 'image' | 'video',
-            media: media
-          };
-        })
-      );
+      const favoritesMap = new Map(favoritesResults.map(r => [r.listingId, r]));
+      const commentsMap = new Map(commentsResults.map(r => [r.listingId, r]));
 
+      const listingsWithExtras = data.map((listing) => {
+        const favorites = favoritesMap.get(listing.id) || { favoritesCount: 0, isFavorite: false };
+        const comments = commentsMap.get(listing.id) || { commentsCount: 0 };
+        
+        const media = allMedia
+          .filter(m => m.listing_id === listing.id)
+          .map(m => ({ url: m.media_url, type: m.media_type as 'image' | 'video' }));
+
+        if (media.length === 0 && listing.media_url) {
+          media.push({ url: listing.media_url, type: listing.media_type as 'image' | 'video' });
+        }
+
+        return {
+          ...listing,
+          is_favorite: favorites.isFavorite,
+          favorites_count: favorites.favoritesCount,
+          comments_count: comments.commentsCount,
+          media_type: listing.media_type as 'image' | 'video',
+          media: media
+        };
+      });
+
+      console.log('✅ Processed listings with extras:', listingsWithExtras.length);
       setListings(listingsWithExtras as MarketplaceListing[]);
-    } catch (error) {
-      console.error('Error fetching listings:', error);
+    } catch (error: any) {
+      console.error('❌ Error fetching listings:', error);
       toast({
-        title: "Erreur",
-        description: "Impossible de charger les annonces",
+        title: "Erreur de chargement",
+        description: error?.message || "Impossible de charger les annonces. Vérifiez votre connexion.",
         variant: "destructive"
       });
+      setListings([]);
     } finally {
       setLoading(false);
     }
