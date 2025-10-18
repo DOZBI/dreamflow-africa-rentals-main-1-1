@@ -171,7 +171,7 @@ export const ModernChatInterface = ({ conversationId, onBack }: ModernChatInterf
         sender_id,
         message_type,
         audio_url,
-        profiles!messages_sender_id_fkey (
+        profiles(
           full_name,
           avatar_url
         )
@@ -202,14 +202,14 @@ export const ModernChatInterface = ({ conversationId, onBack }: ModernChatInterf
           seller_id,
           listing_id,
           created_at,
-          listings!conversations_listing_id_fkey (
+          listings(
             title
           ),
-          buyer_profile:profiles!conversations_buyer_id_fkey (
+          buyer_profile:profiles(
             full_name,
             avatar_url
           ),
-          seller_profile:profiles!conversations_seller_id_fkey (
+          seller_profile:profiles(
             full_name,
             avatar_url
           )
@@ -243,14 +243,14 @@ export const ModernChatInterface = ({ conversationId, onBack }: ModernChatInterf
           seller_id,
           listing_id,
           created_at,
-          listings!conversations_listing_id_fkey (
+          listings(
             title
           ),
-          buyer_profile:profiles!conversations_buyer_id_fkey (
+          buyer_profile:profiles(
             full_name,
             avatar_url
           ),
-          seller_profile:profiles!conversations_seller_id_fkey (
+          seller_profile:profiles(
             full_name,
             avatar_url
           )
@@ -282,7 +282,7 @@ export const ModernChatInterface = ({ conversationId, onBack }: ModernChatInterf
           sender_id,
           message_type,
           audio_url,
-          profiles!messages_sender_id_fkey (
+          profiles(
             full_name,
             avatar_url
           )
@@ -341,7 +341,7 @@ export const ModernChatInterface = ({ conversationId, onBack }: ModernChatInterf
           sender_id,
           message_type,
           audio_url,
-          profiles!messages_sender_id_fkey (
+          profiles(
             full_name,
             avatar_url
           )
@@ -423,7 +423,7 @@ export const ModernChatInterface = ({ conversationId, onBack }: ModernChatInterf
           sender_id,
           message_type,
           audio_url,
-          profiles!messages_sender_id_fkey (
+          profiles(
             full_name,
             avatar_url
           )

@@ -63,7 +63,7 @@ export const useNotifications = () => {
               id,
               content,
               conversation_id,
-              profiles!messages_sender_id_fkey (
+              profiles(
                 full_name
               )
             `)

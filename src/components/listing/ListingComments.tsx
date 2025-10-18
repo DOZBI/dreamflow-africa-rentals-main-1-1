@@ -55,7 +55,7 @@ const ListingComments = ({ listingId, onCommentAdded }: ListingCommentsProps) =>
               content,
               created_at,
               user_id,
-              profiles!listing_comments_user_id_fkey (
+              profiles(
                 full_name,
                 avatar_url
               )
@@ -97,7 +97,7 @@ const ListingComments = ({ listingId, onCommentAdded }: ListingCommentsProps) =>
           content,
           created_at,
           user_id,
-          profiles!listing_comments_user_id_fkey (
+          profiles(
             full_name,
             avatar_url
           )

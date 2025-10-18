@@ -135,14 +135,14 @@ export const MessagesPage = () => {
           listing_id,
           updated_at,
           created_at,
-          listings!conversations_listing_id_fkey (
+          listings(
             title
           ),
-          buyer_profile:profiles!conversations_buyer_id_fkey (
+          buyer_profile:profiles(
             full_name,
             avatar_url
           ),
-          seller_profile:profiles!conversations_seller_id_fkey (
+          seller_profile:profiles(
             full_name,
             avatar_url
           )
