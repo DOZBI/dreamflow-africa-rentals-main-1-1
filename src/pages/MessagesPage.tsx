@@ -138,11 +138,11 @@ export const MessagesPage = () => {
           listings(
             title
           ),
-          buyer_profile:profiles(
+          buyer_profile:profiles!buyer_id(
             full_name,
             avatar_url
           ),
-          seller_profile:profiles(
+          seller_profile:profiles!seller_id(
             full_name,
             avatar_url
           )
