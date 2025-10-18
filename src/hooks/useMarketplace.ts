@@ -132,7 +132,7 @@ export const useMarketplace = () => {
         .from('listings')
         .select(`
           *,
-          profile:profiles!listings_user_id_fkey(full_name, avatar_url),
+          profile:profiles!user_id(full_name, avatar_url),
           category:categories(name, icon)
         `)
         .eq('is_active', true)
@@ -247,7 +247,7 @@ export const useMarketplace = () => {
         .from('listings')
         .select(`
           *,
-          profile:profiles!listings_user_id_fkey(full_name, avatar_url),
+          profile:profiles!user_id(full_name, avatar_url),
           category:categories(name, icon)
         `)
         .in('id', listingIds);
