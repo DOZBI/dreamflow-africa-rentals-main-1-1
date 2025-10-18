@@ -111,7 +111,7 @@ export const MessagesPage = () => {
           description: "Vous pouvez maintenant discuter avec le vendeur",
         });
         
-        await fetchConversations();
+        fetchConversations();
       }
     } catch (error) {
       console.error('Error creating/finding conversation:', error);
@@ -135,9 +135,17 @@ export const MessagesPage = () => {
           listing_id,
           updated_at,
           created_at,
-          listings!listing_id(title),
-          buyer_profile:profiles!buyer_id(full_name, avatar_url),
-          seller_profile:profiles!seller_id(full_name, avatar_url)
+          listings!conversations_listing_id_fkey (
+            title
+          ),
+          buyer_profile:profiles!conversations_buyer_id_fkey (
+            full_name,
+            avatar_url
+          ),
+          seller_profile:profiles!conversations_seller_id_fkey (
+            full_name,
+            avatar_url
+          )
         `)
         .or(`buyer_id.eq.${user?.id},seller_id.eq.${user?.id}`)
         .order('updated_at', { ascending: false });

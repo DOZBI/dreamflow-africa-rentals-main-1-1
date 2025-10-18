@@ -171,7 +171,10 @@ export const ModernChatInterface = ({ conversationId, onBack }: ModernChatInterf
         sender_id,
         message_type,
         audio_url,
-        profiles!sender_id(full_name, avatar_url)
+        profiles!messages_sender_id_fkey (
+          full_name,
+          avatar_url
+        )
       `)
       .eq('id', newMessageData.id)
       .single();
@@ -199,9 +202,17 @@ export const ModernChatInterface = ({ conversationId, onBack }: ModernChatInterf
           seller_id,
           listing_id,
           created_at,
-          listings!listing_id(title),
-          buyer_profile:profiles!buyer_id(full_name, avatar_url),
-          seller_profile:profiles!seller_id(full_name, avatar_url)
+          listings!conversations_listing_id_fkey (
+            title
+          ),
+          buyer_profile:profiles!conversations_buyer_id_fkey (
+            full_name,
+            avatar_url
+          ),
+          seller_profile:profiles!conversations_seller_id_fkey (
+            full_name,
+            avatar_url
+          )
         `)
         .eq('id', convId)
         .single();
@@ -232,9 +243,17 @@ export const ModernChatInterface = ({ conversationId, onBack }: ModernChatInterf
           seller_id,
           listing_id,
           created_at,
-          listings!listing_id(title),
-          buyer_profile:profiles!buyer_id(full_name, avatar_url),
-          seller_profile:profiles!seller_id(full_name, avatar_url)
+          listings!conversations_listing_id_fkey (
+            title
+          ),
+          buyer_profile:profiles!conversations_buyer_id_fkey (
+            full_name,
+            avatar_url
+          ),
+          seller_profile:profiles!conversations_seller_id_fkey (
+            full_name,
+            avatar_url
+          )
         `)
         .or(`buyer_id.eq.${user?.id},seller_id.eq.${user?.id}`)
         .order('updated_at', { ascending: false });
@@ -263,7 +282,10 @@ export const ModernChatInterface = ({ conversationId, onBack }: ModernChatInterf
           sender_id,
           message_type,
           audio_url,
-          profiles!sender_id(full_name, avatar_url)
+          profiles!messages_sender_id_fkey (
+            full_name,
+            avatar_url
+          )
         `)
         .eq('conversation_id', convId)
         .order('created_at', { ascending: true });
@@ -319,7 +341,10 @@ export const ModernChatInterface = ({ conversationId, onBack }: ModernChatInterf
           sender_id,
           message_type,
           audio_url,
-          profiles!sender_id(full_name, avatar_url)
+          profiles!messages_sender_id_fkey (
+            full_name,
+            avatar_url
+          )
         `)
         .single();
 
@@ -398,7 +423,10 @@ export const ModernChatInterface = ({ conversationId, onBack }: ModernChatInterf
           sender_id,
           message_type,
           audio_url,
-          profiles!sender_id(full_name, avatar_url)
+          profiles!messages_sender_id_fkey (
+            full_name,
+            avatar_url
+          )
         `)
         .single();
 
